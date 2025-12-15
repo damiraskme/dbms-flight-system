@@ -23,3 +23,25 @@ This project uses a `.env` file to manage database credentials securely. This fi
 DB_URL=jdbc:mysql://localhost:3306/flight_system
 DB_USER=root
 DB_PASS=password
+```
+
+## 3. How to Run the Project
+
+Please follow these steps in order to start the application successfully.
+
+### Step 1: Initialize the Database
+Before running the Java code, the database schema must exist in your MySQL server.
+
+1.  Start **MySQL Workbench**.
+2.  Open a new query tab and run the following command:
+
+```sql
+CREATE DATABASE flight_system;
+```
+
+### Step 2: Run the Backend
+
+1. Open the project.
+2. Locate the file FlightSystemApplication.java.
+3. Run the file.
+4. Go to http://localhost:8080.
