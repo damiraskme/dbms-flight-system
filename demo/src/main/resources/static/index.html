@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flight System</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; max-width: 1000px; margin: auto; background-color: #f9f9f9; }
+        .section { display: none; }
+        .active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background-color: #007bff; color: white; }
+        tr:hover { background-color: #f1f1f1; }
+        button { cursor: pointer; padding: 6px 12px; border: none; border-radius: 4px; color: white; margin-right: 5px; }
+        .btn-primary { background-color: #007bff; }
+        .btn-danger { background-color: #dc3545; }
+        .btn-warning { background-color: #ffc107; color: black; }
+        .btn-nav { background-color: #6c757d; margin-bottom: 15px; }
+        .btn-action { font-size: 0.8em; }
+        .form-box { background: white; padding: 20px; margin-top: 20px; border-radius: 5px; border: 1px solid #ddd; }
+        input { padding: 8px; margin: 5px 0; width: 200px; border: 1px solid #ccc; border-radius: 4px; }
+        h2 { border-bottom: 2px solid #007bff; padding-bottom: 10px; color: #333; }
+        .split-view { display: flex; gap: 20px; }
+        .split-half { flex: 1; }
+        .status-empty { color: red; font-weight: bold; cursor: pointer; text-decoration: underline; }
+        .status-filled { color: green; font-weight: bold; cursor: pointer; text-decoration: underline; }
+    </style>
+</head>
+<body>
+
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+        <h1>Flight Management System</h1>
+        <button class="btn-primary" onclick="loadAirports()">Home</button>
+    </div>
+
+    <div id="airportSection" class="section active">
+        <h2>Airports</h2>
+        <input type="text" id="searchAirport" placeholder="Search Code..." onkeyup="filterTable('airportTable', 0)">
+        
+        <table id="airportTable">
+            <thead><tr><th>Code</th><th>City</th><th>Country</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+
+        <div class="form-box">
+            <h3 id="airFormTitle">Add New Airport</h3>
+            <input type="hidden" id="airId">
+            <input type="text" id="airCode" placeholder="Code (e.g. JFK)">
+            <input type="text" id="airCity" placeholder="City">
+            <input type="text" id="airCountry" placeholder="Country">
+            <button class="btn-primary" onclick="saveAirport()">Save Airport</button>
+            <button class="btn-warning" onclick="resetForms()">Clear</button>
+        </div>
+    </div>
+
+    <div id="flightSection" class="section">
+        <button class="btn-nav" onclick="showSection('airportSection')">Back to Airports</button>
+        <h2>Flights departing from: <span id="currentOrigin"></span></h2>
+        
+        <input type="text" placeholder="Search Flight #..." onkeyup="filterTable('flightTable', 1)">
+        <table id="flightTable">
+            <thead><tr><th>ID</th><th>Number</th><th>Time</th><th>Destination</th><th>Actions</th></tr></thead>
+            <tbody></tbody>
+        </table>
+
+        <div class="form-box">
+            <h3 id="flightFormTitle">Add Flight</h3>
+            <input type="hidden" id="flightId">
+            <input type="text" id="flightNo" placeholder="Flight #">
+            <input type="datetime-local" id="flightTime">
+            <input type="text" id="flightDest" placeholder="Dest Code">
+            <button class="btn-primary" onclick="saveFlight()">Save Flight</button>
+            <button class="btn-warning" onclick="resetForms()">Clear</button>
+        </div>
+    </div>
+
+    <div id="seatSection" class="section">
+        <button class="btn-nav" onclick="showSection('flightSection')">Back to Flights</button>
+        <h2>Manage Flight ID: <span id="currentFlightId"></span></h2>
+
+        <div class="split-view">
+            <div class="split-half">
+                <h3>Seats</h3>
+                <table id="seatTable">
+                    <thead><tr><th>No</th><th>Class</th><th>Customer</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="form-box">
+                    <h4>Add/Edit Seat</h4>
+                    <input type="hidden" id="seatId">
+                    <input type="text" id="seatNo" placeholder="Seat # (e.g. 1A)">
+                    <input type="text" id="seatClass" placeholder="Class">
+                    <button class="btn-primary" onclick="saveSeat()">Save Seat</button>
+                </div>
+            </div>
+
+            <div class="split-half">
+                <h3>Passengers</h3>
+                <table id="custTable">
+                    <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Actions</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+                <div class="form-box">
+                    <h4>Add New Customer</h4>
+                    <input type="hidden" id="custId">
+                    <input type="text" id="custFirst" placeholder="First Name">
+                    <input type="text" id="custLast" placeholder="Last Name">
+                    <input type="email" id="custEmail" placeholder="Email">
+                    <br>
+                    <input type="text" id="custAssignSeat" placeholder="Assign Seat # (Optional)" style="width: 95%">
+                    <br>
+                    <button class="btn-primary" onclick="saveCustomer()">Save Customer</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentOrigin = '';
+        let currentFlightId = '';
+        let currentFlightSeats = [];
+
+        loadAirports();
+
+        async function api(url, method = 'GET', data = null) {
+            const options = { method: method, headers: { 'Content-Type': 'application/json' } };
+            if (data) options.body = JSON.stringify(data);
+            
+            const res = await fetch(url, options);
+            if (!res.ok) {
+                const errorData = await res.json();
+                handleSpecificError(errorData.message || '');
+                throw new Error('Handled');
+            }
+            return res.json ? res.json() : res;
+        }
+
+        function handleSpecificError(msg) {
+            const lowerMsg = msg.toLowerCase();
+            if (lowerMsg.includes("duplicate entry")) {
+                alert("Error: Value already exists (Duplicate Entry). Check your ID or Keys.");
+            } else if (lowerMsg.includes("foreign key") || lowerMsg.includes("constraint fails")) {
+                alert("Error: Invalid Reference. You are trying to link to an ID (Airport/Flight/Customer) that does not exist.");
+            } else if (lowerMsg.includes("null") || lowerMsg.includes("missing")) {
+                alert("Error: Missing Required Information. Please fill all fields.");
+            } else {
+                alert("Server Error: " + msg);
+            }
+        }
+
+        function showSection(id) {
+            document.querySelectorAll('.section').forEach(el => el.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            resetForms();
+        }
+
+        function resetForms() {
+            document.querySelectorAll('input').forEach(i => i.value = '');
+            document.getElementById('airFormTitle').innerText = 'Add New Airport';
+            document.getElementById('flightFormTitle').innerText = 'Add Flight';
+        }
+
+        function loadAirports() {
+            showSection('airportSection');
+            api('/api/airports').then(data => {
+                const tbody = document.querySelector('#airportTable tbody');
+                tbody.innerHTML = '';
+                data.forEach(a => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td onclick="loadFlights('${a.airportCode}')" style="cursor:pointer; color:blue; font-weight:bold;">${a.airportCode}</td>
+                        <td>${a.city}</td>
+                        <td>${a.country}</td>
+                        <td>
+                            <button class="btn-warning btn-action" onclick="editAirport('${a.airportCode}', '${a.city}', '${a.country}')">Edit</button>
+                            <button class="btn-danger btn-action" onclick="deleteItem('/api/airports/${a.airportCode}', loadAirports)">Del</button>
+                        </td>`;
+                    tbody.appendChild(tr);
+                });
+            }).catch(() => {});
+        }
+
+        function saveAirport() {
+            const id = document.getElementById('airId').value;
+            const data = {
+                airportCode: document.getElementById('airCode').value,
+                city: document.getElementById('airCity').value,
+                country: document.getElementById('airCountry').value
+            };
+            
+            if(!data.airportCode || !data.city) return alert("Missing Fields!");
+
+            const req = id ? api(`/api/airports/${id}`, 'PUT', data) : api('/api/airports', 'POST', data);
+            req.then(() => { resetForms(); loadAirports(); }).catch(() => {});
+        }
+
+        function editAirport(code, city, country) {
+            document.getElementById('airId').value = code;
+            document.getElementById('airCode').value = code;
+            document.getElementById('airCode').disabled = true;
+            document.getElementById('airCity').value = city;
+            document.getElementById('airCountry').value = country;
+            document.getElementById('airFormTitle').innerText = 'Edit Airport ' + code;
+        }
+
+        function loadFlights(origin) {
+            currentOrigin = origin;
+            document.getElementById('currentOrigin').innerText = origin;
+            showSection('flightSection');
+            
+            api(`/api/flights?origin=${origin}`).then(data => {
+                const tbody = document.querySelector('#flightTable tbody');
+                tbody.innerHTML = '';
+                data.forEach(f => {
+                    const tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td onclick="loadSeats(${f.flightId})" style="cursor:pointer; color:blue;">${f.flightId}</td>
+                        <td>${f.flightNumber}</td>
+                        <td>${f.departureTime}</td>
+                        <td>${f.destinationCode}</td>
+                        <td>
+                            <button class="btn-warning btn-action" onclick="editFlight(${f.flightId}, '${f.flightNumber}', '${f.departureTime}', '${f.destinationCode}')">Edit</button>
+                            <button class="btn-danger btn-action" onclick="deleteItem('/api/flights/${f.flightId}', () => loadFlights(currentOrigin))">Del</button>
+                        </td>`;
+                    tbody.appendChild(tr);
+                });
+            }).catch(() => {});
+        }
+
+        function saveFlight() {
+            const id = document.getElementById('flightId').value;
+            const data = {
+                flightNumber: document.getElementById('flightNo').value,
+                departureTime: document.getElementById('flightTime').value,
+                originCode: currentOrigin,
+                destinationCode: document.getElementById('flightDest').value
+            };
+            const req = id ? api(`/api/flights/${id}`, 'PUT', data) : api('/api/flights', 'POST', data);
+            req.then(() => { resetForms(); loadFlights(currentOrigin); }).catch(() => {});
+        }
+
+        function editFlight(id, no, time, dest) {
+            document.getElementById('flightId').value = id;
+            document.getElementById('flightNo').value = no;
+            document.getElementById('flightTime').value = time;
+            document.getElementById('flightDest').value = dest;
+            document.getElementById('flightFormTitle').innerText = 'Edit Flight ' + id;
+        }
+
+        function loadSeats(flightId) {
+            currentFlightId = flightId;
+            document.getElementById('currentFlightId').innerText = flightId;
+            showSection('seatSection');
+
+            api(`/api/seats?flightId=${flightId}`).then(seats => {
+                currentFlightSeats = seats;
+                const seatBody = document.querySelector('#seatTable tbody');
+                const custBody = document.querySelector('#custTable tbody');
+                seatBody.innerHTML = '';
+                custBody.innerHTML = '';
+                
+                const customersFetched = new Set();
+
+                seats.forEach(s => {
+                    const custStatus = s.customerId 
+                        ? `<span class="status-filled" onclick="updateSeatAssignment(${s.seatId}, ${s.customerId})">ID: ${s.customerId} (Change)</span>` 
+                        : `<span class="status-empty" onclick="updateSeatAssignment(${s.seatId}, null)">Empty (Assign)</span>`;
+                    
+                    seatBody.innerHTML += `
+                        <tr>
+                            <td>${s.seatNumber}</td>
+                            <td>${s.classType}</td>
+                            <td>${custStatus}</td>
+                            <td>
+                                <button class="btn-warning btn-action" onclick="editSeat(${s.seatId}, '${s.seatNumber}', '${s.classType}')">Edit</button>
+                                <button class="btn-danger btn-action" onclick="deleteItem('/api/seats/${s.seatId}', () => loadSeats(currentFlightId))">Del</button>
+                            </td>
+                        </tr>`;
+
+                    if(s.customerId && !customersFetched.has(s.customerId)) {
+                        customersFetched.add(s.customerId);
+                        api(`/api/customers/${s.customerId}`).then(c => {
+                            custBody.innerHTML += `
+                                <tr>
+                                    <td>${c.customerId}</td>
+                                    <td>${c.firstName} ${c.lastName}</td>
+                                    <td>${c.email}</td>
+                                    <td><button class="btn-danger btn-action" onclick="deleteItem('/api/customers/${c.customerId}', () => loadSeats(currentFlightId))">Del</button></td>
+                                </tr>`;
+                        });
+                    }
+                });
+            }).catch(() => {});
+        }
+
+        function saveSeat() {
+            const id = document.getElementById('seatId').value;
+            const data = {
+                seatNumber: document.getElementById('seatNo').value,
+                classType: document.getElementById('seatClass').value,
+                flightId: currentFlightId
+            };
+            const req = id ? api(`/api/seats/${id}`, 'PUT', data) : api('/api/seats', 'POST', data);
+            req.then(() => { resetForms(); loadSeats(currentFlightId); }).catch(() => {});
+        }
+
+        function editSeat(id, no, type) {
+            document.getElementById('seatId').value = id;
+            document.getElementById('seatNo').value = no;
+            document.getElementById('seatClass').value = type;
+        }
+
+        function updateSeatAssignment(seatId, currentCustId) {
+            const promptMsg = currentCustId 
+                ? `Current Customer ID: ${currentCustId}\nEnter new Customer ID to switch, or 0 to remove:` 
+                : "Enter Customer ID to assign:";
+            
+            const newId = prompt(promptMsg);
+            
+            if(newId !== null) {
+                api(`/api/seats/${seatId}`, 'PUT', { customerId: newId })
+                .then(() => loadSeats(currentFlightId))
+                .catch(() => {});
+            }
+        }
+
+        function saveCustomer() {
+            const custData = {
+                firstName: document.getElementById('custFirst').value,
+                lastName: document.getElementById('custLast').value,
+                email: document.getElementById('custEmail').value
+            };
+
+            const seatNoToAssign = document.getElementById('custAssignSeat').value;
+
+            api('/api/customers', 'POST', custData).then(newCust => {
+                alert(`Customer Created! ID: ${newCust.customerId}`);
+                
+                if(seatNoToAssign) {
+                    const seat = currentFlightSeats.find(s => s.seatNumber === seatNoToAssign);
+                    if(seat) {
+                        api(`/api/seats/${seat.seatId}`, 'PUT', { customerId: newCust.customerId })
+                        .then(() => {
+                            alert("Seat assigned successfully!");
+                            loadSeats(currentFlightId);
+                            resetForms();
+                        });
+                    } else {
+                        alert("Customer created, but Seat '" + seatNoToAssign + "' not found on this flight.");
+                        loadSeats(currentFlightId);
+                        resetForms();
+                    }
+                } else {
+                    loadSeats(currentFlightId);
+                    resetForms();
+                }
+            }).catch(() => {});
+        }
+
+        function deleteItem(url, refreshCallback) {
+            if(confirm("Are you sure?")) {
+                api(url, 'DELETE').then(refreshCallback).catch(() => {});
+            }
+        }
+
+        function filterTable(tableId, colIndex) {
+            const input = event.target.value.toUpperCase();
+            const rows = document.querySelector('#' + tableId + ' tbody').rows;
+            for(let i=0; i<rows.length; i++) {
+                const txt = rows[i].cells[colIndex].textContent || rows[i].cells[colIndex].innerText;
+                rows[i].style.display = txt.toUpperCase().indexOf(input) > -1 ? "" : "none";
+            }
+        }
+    </script>
+</body>
+</html>
