@@ -11,18 +11,13 @@ The application allows users to:
 * Manage Seats on a flight and assign Passengers.
 * Manage Customer information.
 
-## 2. Configuration (.env)
-This project uses a `.env` file to manage database credentials securely. This file is not included in the source code (it is git-ignored).
+## 2. Configuration 
+Change the following lines to the application.properties file, replacing the values with your local MySQL configuration:
 
-**You must create this file manually to run the project.**
-
-1.  Create a file named `.env` in the of the project.
-2.  Add the following lines to the file, replacing the values with your local MySQL configuration:
-
-```properties
-DB_URL=jdbc:mysql://localhost:3306/flight_system
-DB_USER=root
-DB_PASS=password
+```application.properties
+spring.datasource.url=jdbc:mysql://localhost:3306/flight_system
+spring.datasource.username=root
+spring.datasource.password=root_password
 ```
 
 ## 3. How to Run the Project
